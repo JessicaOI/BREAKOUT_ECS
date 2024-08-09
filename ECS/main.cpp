@@ -1,153 +1,57 @@
-#define SDL_MAIN_HANDLED
+#include <entt/entt.hpp>
 #include <SDL.h>
-//#include <SDL_ttf.h>
-#include <SDL_keyboard.h>
-#include <SDL_render.h>
-#include <SDL_scancode.h>
-#include <string>
 #include <iostream>
 #include <vector>
-#include <cmath>
 
+// Definiciones de constantes
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
-const int MAX_FPS = 60;
-const int BALL_SPEED = 120;
-const int BALL_SIZE = 13;
 const int PADDLE_WIDTH = 100;
 const int PADDLE_HEIGHT = 20;
-const int PADDLE_SPEED = 200;
+const int BALL_SIZE = 15;
 const int BLOCK_ROWS = 5;
 const int BLOCK_COLUMNS = 10;
 const int BLOCK_WIDTH = SCREEN_WIDTH / BLOCK_COLUMNS;
 const int BLOCK_HEIGHT = 20;
+const int MAX_FPS = 60;
+const float PADDLE_SPEED = 300.0f;
+const float BALL_SPEED = 200.0f;
 
-struct Rect {
-    SDL_Rect rect = {0, 0, BALL_SIZE, BALL_SIZE};
-    float vx = BALL_SPEED;
-    float vy = BALL_SPEED;
-    SDL_Color color = {0xFF, 0x00, 0x00, 0xFF}; // Rojo
+// Definiciones de componentes
+struct Position {
+    float x, y;
+};
+
+struct Velocity {
+    float vx, vy;
+};
+
+struct Renderable {
+    SDL_Rect rect;
+    SDL_Color color;
+};
+
+struct Paddle {
+    // Component específico para el paddle
+};
+
+struct Ball {
+    // Component específico para la pelota
 };
 
 struct Block {
-    SDL_Rect rect;
-    bool destroyed = false;
+    bool destroyed;
 };
 
-Rect ball = {{110, 110, BALL_SIZE, BALL_SIZE}, BALL_SPEED, BALL_SPEED, {0xFF, 0x00, 0x00, 0xFF}};//posicion inicial de la pelota
-SDL_Rect paddle = {SCREEN_WIDTH / 2 - PADDLE_WIDTH / 2, SCREEN_HEIGHT - PADDLE_HEIGHT - 10, PADDLE_WIDTH, PADDLE_HEIGHT};
-std::vector<Block> blocks;
-
-void createBlocks() {
-    for (int i = 0; i < BLOCK_ROWS; ++i) {
-        for (int j = 0; j < BLOCK_COLUMNS; ++j) {
-            blocks.push_back({{j * BLOCK_WIDTH, i * BLOCK_HEIGHT, BLOCK_WIDTH, BLOCK_HEIGHT}});
-        }
-    }
-}
-
-void renderRect(SDL_Renderer* renderer, Rect& rect) {
-    SDL_SetRenderDrawColor(renderer, rect.color.r, rect.color.g, rect.color.b, rect.color.a);
-    SDL_RenderFillRect(renderer, &rect.rect);
-}
-
-void renderPaddle(SDL_Renderer* renderer, SDL_Rect& paddle) {
-    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF); // Blanco
-    SDL_RenderFillRect(renderer, &paddle);
-}
-
-void renderBlocks(SDL_Renderer* renderer) {
-    for (const auto& block : blocks) {
-        if (!block.destroyed) {
-            // Dibujar borde negro
-            SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF); // Negro
-            SDL_Rect borderRect = {block.rect.x - 1, block.rect.y - 1, block.rect.w + 2, block.rect.h + 2};
-            SDL_RenderFillRect(renderer, &borderRect);
-
-            // Dibujar bloque verde
-            SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF); // Verde
-            SDL_RenderFillRect(renderer, &block.rect);
-        }
-    }
-}
-
-void update(float dT, bool& gameOver, bool& youWin) {
-    // Rebote en los bordes de la pantalla
-    if (ball.rect.x < 0 || ball.rect.x + ball.rect.w > SCREEN_WIDTH) {
-        ball.vx *= -1;
-    }
-    if (ball.rect.y < 0) {
-        ball.vy *= -1;
-    }
-
-    // Si la pelota toca la parte inferior de la pantalla
-    if (ball.rect.y + ball.rect.h > SCREEN_HEIGHT) {
-        gameOver = true;
-        std::cout << "Game Over" << std::endl;
-    }
-
-    // Rebote con el paddle
-    if (SDL_HasIntersection(&ball.rect, &paddle)) {
-        // Calcular el punto de impacto relativo en el paddle
-        float relativeIntersectX = (ball.rect.x + (BALL_SIZE / 2)) - (paddle.x + (paddle.w / 2));
-        float normalizedRelativeIntersectionX = relativeIntersectX / (paddle.w / 2);
-        float bounceAngle = normalizedRelativeIntersectionX * (M_PI / 4); // Ángulo máximo de 45 grados
-
-        // Ajustar velocidades de la pelota
-        ball.vx = BALL_SPEED * normalizedRelativeIntersectionX;
-        ball.vy = -BALL_SPEED * std::cos(bounceAngle);
-
-        // Aumentar la velocidad de la pelota
-        ball.vx *= 1.1f;
-        ball.vy *= 1.1f;
-
-        ball.rect.y = paddle.y - ball.rect.h; // La pelota se mueva hacia arriba después de rebotar
-    }
-
-    // Colisión con bloques
-    bool allBlocksDestroyed = true;
-    for (auto& block : blocks) {
-        if (!block.destroyed && SDL_HasIntersection(&ball.rect, &block.rect)) {
-            block.destroyed = true;
-            ball.vy *= -1;
-            break;
-        }
-        if (!block.destroyed) {
-            allBlocksDestroyed = false;
-        }
-    }
-
-    if (allBlocksDestroyed) {
-        youWin = true;
-        std::cout << "You Win!" << std::endl;
-    }
-
-    ball.rect.x += ball.vx * dT;
-    ball.rect.y += ball.vy * dT;
-}
-
-void handleInput(float dT) {
-    const Uint8* ks = SDL_GetKeyboardState(NULL);
-
-    if (ks[SDL_SCANCODE_LEFT]) {
-        paddle.x -= PADDLE_SPEED * dT;
-    }
-    if (ks[SDL_SCANCODE_RIGHT]) {
-        paddle.x += PADDLE_SPEED * dT;
-    }
-
-    if (paddle.x < 0) paddle.x = 0;
-    if (paddle.x > SCREEN_WIDTH - PADDLE_WIDTH) paddle.x = SCREEN_WIDTH - PADDLE_WIDTH;
-}
-
 int main() {
-    SDL_SetMainReady(); // Esto se llama para inicializar correctamente SDL en entornos no predeterminados
+    // Inicialización de SDL
+    SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "Error initializing SDL: " << SDL_GetError() << std::endl;
         return -1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("Bouncing Ball with Paddle", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    SDL_Window* window = SDL_CreateWindow("Breakout ECS", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
     if (!window) {
         std::cerr << "Error creating window: " << SDL_GetError() << std::endl;
         SDL_Quit();
@@ -162,65 +66,157 @@ int main() {
         return -1;
     }
 
-    createBlocks();
+    entt::registry registry;
+
+    // Creación de entidades
+    auto paddleEntity = registry.create();
+    registry.emplace<Position>(paddleEntity, SCREEN_WIDTH / 2.0f - PADDLE_WIDTH / 2.0f, SCREEN_HEIGHT - PADDLE_HEIGHT - 10);
+    registry.emplace<Velocity>(paddleEntity, 0.0f, 0.0f);
+    registry.emplace<Renderable>(paddleEntity, SDL_Rect{0, 0, PADDLE_WIDTH, PADDLE_HEIGHT}, SDL_Color{0xFF, 0xFF, 0xFF, 0xFF});
+    registry.emplace<Paddle>(paddleEntity);
+
+    auto ballEntity = registry.create();
+    registry.emplace<Position>(ballEntity, 110.0f, 110.0f);
+    registry.emplace<Velocity>(ballEntity, BALL_SPEED, BALL_SPEED);
+    registry.emplace<Renderable>(ballEntity, SDL_Rect{0, 0, BALL_SIZE, BALL_SIZE}, SDL_Color{0xFF, 0x00, 0x00, 0xFF});
+    registry.emplace<Ball>(ballEntity);
+
+    // Creación de bloques
+    for (int i = 0; i < BLOCK_ROWS; ++i) {
+        for (int j = 0; j < BLOCK_COLUMNS; ++j) {
+            auto blockEntity = registry.create();
+            registry.emplace<Position>(blockEntity, j * BLOCK_WIDTH, i * BLOCK_HEIGHT);
+            registry.emplace<Renderable>(blockEntity, SDL_Rect{0, 0, BLOCK_WIDTH, BLOCK_HEIGHT}, SDL_Color{0x00, 0xFF, 0x00, 0xFF});
+            registry.emplace<Block>(blockEntity, false);
+        }
+    }
+
+    // Sistema de renderizado
+    auto renderSystem = [&](SDL_Renderer* renderer) {
+        auto view = registry.view<Position, Renderable>();
+        for (auto entity : view) {
+            auto& pos = view.get<Position>(entity);
+            auto& renderable = view.get<Renderable>(entity);
+            renderable.rect.x = static_cast<int>(pos.x);
+            renderable.rect.y = static_cast<int>(pos.y);
+            SDL_SetRenderDrawColor(renderer, renderable.color.r, renderable.color.g, renderable.color.b, renderable.color.a);
+            SDL_RenderFillRect(renderer, &renderable.rect);
+        }
+    };
+
+    // Sistema de movimiento
+    auto movementSystem = [&](float dT) {
+        auto view = registry.view<Position, Velocity>();
+        for (auto entity : view) {
+            auto& pos = view.get<Position>(entity);
+            auto& vel = view.get<Velocity>(entity);
+            pos.x += vel.vx * dT;
+            pos.y += vel.vy * dT;
+        }
+    };
+
+    // Sistema de entrada
+    auto inputSystem = [&](float dT) {
+        const Uint8* ks = SDL_GetKeyboardState(NULL);
+        auto view = registry.view<Position, Paddle>();
+
+        for (auto entity : view) {
+            auto& pos = view.get<Position>(entity);
+            if (ks[SDL_SCANCODE_LEFT]) {
+                pos.x -= PADDLE_SPEED * dT;
+            }
+            if (ks[SDL_SCANCODE_RIGHT]) {
+                pos.x += PADDLE_SPEED * dT;
+            }
+            if (pos.x < 0) pos.x = 0;
+            if (pos.x > SCREEN_WIDTH - PADDLE_WIDTH) pos.x = SCREEN_WIDTH - PADDLE_WIDTH;
+        }
+    };
+
+    // Sistema de colisiones
+    auto collisionSystem = [&]() {
+        auto ballView = registry.view<Position, Velocity, Ball>();
+        auto paddleView = registry.view<Position, Paddle>();
+        auto blockView = registry.view<Position, Block>();
+
+        for (auto ballEntity : ballView) {
+            auto& ballPos = ballView.get<Position>(ballEntity);
+            auto& ballVel = ballView.get<Velocity>(ballEntity);
+
+            // Colisiones con bordes de pantalla
+            if (ballPos.x < 0 || ballPos.x + BALL_SIZE > SCREEN_WIDTH) {
+                ballVel.vx *= -1;
+            }
+            if (ballPos.y < 0) {
+                ballVel.vy *= -1;
+            }
+            if (ballPos.y + BALL_SIZE > SCREEN_HEIGHT) {
+                std::cout << "Game Over" << std::endl;
+                exit(0);
+            }
+
+            // Colisiones con el paddle
+            for (auto paddleEntity : paddleView) {
+                auto& paddlePos = paddleView.get<Position>(paddleEntity);
+                if (ballPos.x < paddlePos.x + PADDLE_WIDTH &&
+                    ballPos.x + BALL_SIZE > paddlePos.x &&
+                    ballPos.y < paddlePos.y + PADDLE_HEIGHT &&
+                    ballPos.y + BALL_SIZE > paddlePos.y) {
+
+                    ballVel.vy *= -1;
+                    ballVel.vx *= 1.1f;
+                    ballVel.vy *= 1.1f;
+                }
+            }
+
+            // Colisiones con bloques
+            for (auto blockEntity : blockView) {
+                auto& blockPos = blockView.get<Position>(blockEntity);
+                auto& block = blockView.get<Block>(blockEntity);
+                if (!block.destroyed &&
+                    ballPos.x < blockPos.x + BLOCK_WIDTH &&
+                    ballPos.x + BALL_SIZE > blockPos.x &&
+                    ballPos.y < blockPos.y + BLOCK_HEIGHT &&
+                    ballPos.y + BALL_SIZE > blockPos.y) {
+
+                    block.destroyed = true;
+                    ballVel.vy *= -1;
+                }
+            }
+        }
+    };
 
     bool quit = false;
-    bool gameOver = false;
-    bool youWin = false;
     SDL_Event e;
 
-    Uint32 frameStartTimestamp, frameEndTimestamp, lastFrameTime = SDL_GetTicks(), lastUpdateTime = 0;
+    Uint32 lastFrameTime = SDL_GetTicks();
     float frameDuration = (1.0f / MAX_FPS) * 1000.0f;
-    int FPS = MAX_FPS;
 
     while (!quit) {
-        frameStartTimestamp = SDL_GetTicks();
-
-        // delta time
+        Uint32 frameStartTimestamp = SDL_GetTicks();
         Uint32 currentFrameTime = SDL_GetTicks();
         float dT = (currentFrameTime - lastFrameTime) / 1000.0f;
         lastFrameTime = currentFrameTime;
 
-        // poll events
         while (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_QUIT) {
                 quit = true;
             }
         }
 
-        // handle input
-        if (!gameOver && !youWin) {
-            handleInput(dT);
-        }
+        inputSystem(dT);
+        movementSystem(dT);
+        collisionSystem();
 
-        // update
-        if (!gameOver && !youWin) {
-            update(dT, gameOver, youWin);
-        }
-
-        // render
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
         SDL_RenderClear(renderer);
-
-        renderRect(renderer, ball);
-        renderPaddle(renderer, paddle);
-        renderBlocks(renderer);
-
+        renderSystem(renderer);
         SDL_RenderPresent(renderer);
 
-        frameEndTimestamp = SDL_GetTicks();
+        Uint32 frameEndTimestamp = SDL_GetTicks();
         float actualFrameDuration = frameEndTimestamp - frameStartTimestamp;
-
         if (actualFrameDuration < frameDuration) {
             SDL_Delay(frameDuration - actualFrameDuration);
-        }
-
-        // calculo de fps
-        Uint32 currentTime = SDL_GetTicks();
-        if (currentTime - lastUpdateTime > 1000) {
-            FPS = static_cast<int>((1.0f / actualFrameDuration) * 1000.0f);
-            SDL_SetWindowTitle(window, ("FPS: " + std::to_string(FPS)).c_str());
-            lastUpdateTime = currentTime;
         }
     }
 
