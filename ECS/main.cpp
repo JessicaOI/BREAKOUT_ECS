@@ -1,5 +1,6 @@
-#include <entt/entt.hpp>
+#define SDL_MAIN_HANDLED
 #include <SDL.h>
+#include <entt/entt.hpp>
 #include <iostream>
 #include <vector>
 
@@ -45,7 +46,6 @@ struct Block {
 
 int main() {
     // Inicialización de SDL
-    SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "Error initializing SDL: " << SDL_GetError() << std::endl;
         return -1;
